@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>NFC Reader</title>
+</head>
+<body>
+  <h2>สแกน NFC แล้วบันทึกไป Spreadsheet</h2>
+  <button id="scanBtn">เริ่มสแกน</button>
+  <p id="result">รอการสแกน...</p>
+
+  <script>
+    // ✅ ใช้ URL ของ Web App เอง (doPost)
+    const scriptUrl = "<?= ScriptApp.getService().getUrl() ?>";
+
+    document.getElementById("scanBtn").addEventListener("click", async () => {
+      try {
+        const ndef = new NDEFReader();
+        await ndef.scan();
+        document.getElementById("result").innerText = "กำลังสแกน...";
+
+        ndef.onreading = async (event) => {
+          const decoder = new TextDecoder();
+          let record1 = "";
+          for (const record of event.message.records) {
+            if (record.recordType === "text") {
+              record1 = decoder.decode(record.data);
+              break; // ✅ เก็บเฉพาะ Record 1
+            }
+          }
+
+          document.getElementById("result").innerText = "Record 1: " + record1;
+
+          // ส่งค่าไปบันทึกที่ Apps Script
+          await fetch(scriptUrl, {
+            method: "POST",
+            body: JSON.stringify({ record1: record1 }),
+            headers: { "Content-Type": "application/json" }
+          });
+        };
+      } catch (error) {
+        document.getElementById("result").innerText = "Error: " + error;
+      }
+    });
+  </script>
+</body>
+</html>
