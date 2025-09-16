@@ -9,7 +9,7 @@ body { font-family:sans-serif; max-width:720px; margin:20px auto; padding:0 16px
 h1 { font-size:1.2rem; }
 .card { border:1px solid #ddd; border-radius:12px; padding:16px; margin:12px 0; }
 .uid { font-weight:700; font-family:monospace; }
-.log { height:200px; overflow:auto; background:#fafafa; border:1px solid #eee; padding:8px; border-radius:8px; }
+.log { height:220px; overflow:auto; background:#fafafa; border:1px solid #eee; padding:8px; border-radius:8px; }
 .ok {color:green} .err{color:red} .warn{color:#a66}
 </style>
 </head>
@@ -32,10 +32,10 @@ h1 { font-size:1.2rem; }
 </div>
 
 <script>
-/* ===== ตั้งค่าของคุณ ===== */
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzu4W9Rr2BSnIoNmDfeCKuzHwel3UCAuN9tJRkn5UHGBbuqG04UCuG6hi7FwKrzSa5V/exec'; // ← ใส่ URL ของคุณ
+/* ==== ตั้งค่าของคุณ ==== */
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzu4W9Rr2BSnIoNmDfeCKuzHwel3UCAuN9tJRkn5UHGBbuqG04UCuG6hi7FwKrzSa5V/exec'; // ← URL /exec จาก Web App
 const TOKEN   = '123'; // ← ให้ตรงกับ SIMPLE_TOKEN (หรือ '' ถ้าไม่ใช้)
-/* ========================= */
+/* ======================= */
 
 const $ = s => document.querySelector(s);
 const log = (m, c='') => {
@@ -64,11 +64,11 @@ async function startScan() {
 
     r.onreading = ev => {
       const uid = (ev.serialNumber || '').replace(/:/g, '').toLowerCase();
-      if (!uid) { log('ไม่พบ UID', 'err'); return; }
+      if (!uid) { log('ไม่พบ UID','err'); return; }
 
       const now = Date.now();
       if (uid === lastUID && (now - lastTime) < 1200) {
-        log('ซ้ำเร็วเกิน', 'warn'); return;
+        log('ซ้ำเร็วเกิน','warn'); return;
       }
       lastUID = uid; lastTime = now;
 
@@ -76,7 +76,6 @@ async function startScan() {
       log(`UID: ${uid}`);
 
       saveToSheet(uid);
-
       if (navigator.vibrate) navigator.vibrate(50);
     };
 
@@ -95,7 +94,7 @@ function stopScan() {
 
 async function saveToSheet(uid) {
   try {
-    // ส่งแบบ form-encoded และ no-cors → เบราว์เซอร์จะยอมยิงคำขอโดยไม่เช็ค CORS
+    // ส่งแบบ form-encoded + no-cors เพื่อตัดปัญหา CORS
     const params = new URLSearchParams({
       uid,
       device: (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '',
@@ -104,13 +103,13 @@ async function saveToSheet(uid) {
 
     await fetch(GAS_URL, {
       method: 'POST',
-      mode: 'no-cors', // สำคัญ!
+      mode: 'no-cors', // สำคัญ
       headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
       body: params.toString()
     });
 
-    // no-cors อ่านผลตอบกลับไม่ได้ แต่คำสั่งถูกส่งไปแล้ว
-    log('ส่งแล้ว (ข้อมูลจะเข้า Google Sheets ภายในไม่กี่วินาที)', 'ok');
+    // no-cors: อ่าน response ไม่ได้ แต่งานส่งถูกยิงแล้ว
+    log('ส่งแล้ว (ข้อมูลจะเข้า Google Sheets เร็ว ๆ นี้)', 'ok');
 
   } catch (e) {
     log('ส่งไม่สำเร็จ: ' + e, 'err');
