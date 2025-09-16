@@ -1,47 +1,76 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <title>NFC Reader</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFC Auto Scan</title>
+<style>
+body { font-family:sans-serif; max-width:720px; margin:20px auto; padding:0 16px; }
+h1 { font-size:1.2rem; }
+.card { border:1px solid #ddd; border-radius:12px; padding:16px; margin:12px 0; }
+.uid { font-weight:700; font-family:monospace; }
+.log { height:200px; overflow:auto; background:#fafafa; border:1px solid #eee; padding:8px; border-radius:8px; }
+.ok {color:green} .err{color:red} .warn{color:#a66}
+</style>
 </head>
 <body>
-  <h2>สแกน NFC แล้วบันทึกไป Spreadsheet</h2>
-  <button id="scanBtn">เริ่มสแกน</button>
-  <p id="result">รอการสแกน...</p>
+<h1>สแกน NFC → บันทึกอัตโนมัติ</h1>
 
-  <script>
-    // ✅ ใช้ URL ของ Web App เอง (doPost)
-    const scriptUrl = "<?= ScriptApp.getService().getUrl() ?>";
+<div class="card">
+  <button id="btnStart">เริ่มสแกน</button>
+  <button id="btnStop" disabled>หยุด</button>
+  <p><b>สถานะ:</b> <span id="status">รอเริ่มสแกน</span></p>
+</div>
 
-    document.getElementById("scanBtn").addEventListener("click", async () => {
-      try {
-        const ndef = new NDEFReader();
-        await ndef.scan();
-        document.getElementById("result").innerText = "กำลังสแกน...";
+<div class="card">
+  <b>UID ล่าสุด:</b> <span id="last" class="uid">-</span>
+</div>
 
-        ndef.onreading = async (event) => {
-          const decoder = new TextDecoder();
-          let record1 = "";
-          for (const record of event.message.records) {
-            if (record.recordType === "text") {
-              record1 = decoder.decode(record.data);
-              break; // ✅ เก็บเฉพาะ Record 1
-            }
-          }
+<div class="card">
+  <b>บันทึกเหตุการณ์</b>
+  <div id="log" class="log"></div>
+</div>
 
-          document.getElementById("result").innerText = "Record 1: " + record1;
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/xxxxxx/exec'; // ใส่ Web App URL
+const TOKEN   = 'my-secret-123'; // ต้องตรงกับ SIMPLE_TOKEN
 
-          // ส่งค่าไปบันทึกที่ Apps Script
-          await fetch(scriptUrl, {
-            method: "POST",
-            body: JSON.stringify({ record1: record1 }),
-            headers: { "Content-Type": "application/json" }
-          });
-        };
-      } catch (error) {
-        document.getElementById("result").innerText = "Error: " + error;
-      }
-    });
-  </script>
+const $=s=>document.querySelector(s);
+const log=(m,c='')=>{const e=document.createElement('div'); if(c)e.className=c; e.textContent=`[${new Date().toLocaleTimeString()}] ${m}`; $('#log').prepend(e);};
+
+let controller,lastUID='',lastTime=0;
+
+async function startScan(){
+  if(!('NDEFReader'in window)){alert('Web NFC ใช้ได้เฉพาะ Android + Chrome + HTTPS');return;}
+  try{
+    controller=new AbortController();
+    const r=new NDEFReader();
+    await r.scan({signal:controller.signal});
+    $('#status').textContent='กำลังสแกน...'; $('#btnStart').disabled=true; $('#btnStop').disabled=false; log('เริ่มสแกนแล้ว');
+    r.onreading=ev=>{
+      const uid=(ev.serialNumber||'').replace(/:/g,'').toLowerCase();
+      if(!uid){log('ไม่พบ UID','err');return;}
+      const now=Date.now(); if(uid===lastUID && now-lastTime<1200){log('ซ้ำเร็วเกิน','warn');return;}
+      lastUID=uid; lastTime=now;
+      $('#last').textContent=uid.toUpperCase(); log(`UID: ${uid}`);
+      saveToSheet(uid);
+      if(navigator.vibrate)navigator.vibrate(50);
+    };
+  }catch(e){alert('เริ่มสแกนไม่ได้: '+e); log(e,'err');}
+}
+
+function stopScan(){ if(controller){controller.abort(); controller=null;} $('#status').textContent='หยุดสแกนแล้ว'; $('#btnStart').disabled=false; $('#btnStop').disabled=true;}
+
+async function saveToSheet(uid){
+  try{
+    const params=new URLSearchParams({uid,device:navigator.platform||'',token:TOKEN});
+    const res=await fetch(GAS_URL,{method:'POST',body:params});
+    if(res.ok) log('บันทึกแล้ว: '+uid,'ok'); else log('บันทึกล้มเหลว '+res.status,'err');
+  }catch(e){log('ส่งไม่สำเร็จ: '+e,'err');}
+}
+
+$('#btnStart').onclick=startScan;
+$('#btnStop').onclick=stopScan;
+</script>
 </body>
 </html>
