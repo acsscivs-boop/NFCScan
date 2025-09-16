@@ -32,8 +32,8 @@ h1 { font-size:1.2rem; }
 </div>
 
 <script>
-const GAS_URL = 'https://script.google.com/macros/s/xxxxxx/exec'; // ใส่ Web App URL
-const TOKEN   = 'my-secret-123'; // ต้องตรงกับ SIMPLE_TOKEN
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzu4W9Rr2BSnIoNmDfeCKuzHwel3UCAuN9tJRkn5UHGBbuqG04UCuG6hi7FwKrzSa5V/exec'; // ใส่ Web App URL
+const TOKEN   = '123'; // ต้องตรงกับ SIMPLE_TOKEN
 
 const $=s=>document.querySelector(s);
 const log=(m,c='')=>{const e=document.createElement('div'); if(c)e.className=c; e.textContent=`[${new Date().toLocaleTimeString()}] ${m}`; $('#log').prepend(e);};
@@ -74,3 +74,4 @@ $('#btnStop').onclick=stopScan;
 </script>
 </body>
 </html>
+
