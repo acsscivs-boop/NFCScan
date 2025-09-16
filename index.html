@@ -32,46 +32,93 @@ h1 { font-size:1.2rem; }
 </div>
 
 <script>
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbzu4W9Rr2BSnIoNmDfeCKuzHwel3UCAuN9tJRkn5UHGBbuqG04UCuG6hi7FwKrzSa5V/exec'; // ใส่ Web App URL
-const TOKEN   = '123'; // ต้องตรงกับ SIMPLE_TOKEN
+/* ===== ตั้งค่าของคุณ ===== */
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzu4W9Rr2BSnIoNmDfeCKuzHwel3UCAuN9tJRkn5UHGBbuqG04UCuG6hi7FwKrzSa5V/exec'; // ← ใส่ URL ของคุณ
+const TOKEN   = '123'; // ← ให้ตรงกับ SIMPLE_TOKEN (หรือ '' ถ้าไม่ใช้)
+/* ========================= */
 
-const $=s=>document.querySelector(s);
-const log=(m,c='')=>{const e=document.createElement('div'); if(c)e.className=c; e.textContent=`[${new Date().toLocaleTimeString()}] ${m}`; $('#log').prepend(e);};
+const $ = s => document.querySelector(s);
+const log = (m, c='') => {
+  const e = document.createElement('div');
+  if (c) e.className = c;
+  e.textContent = `[${new Date().toLocaleTimeString()}] ${m}`;
+  $('#log').prepend(e);
+};
 
-let controller,lastUID='',lastTime=0;
+let controller, lastUID = '', lastTime = 0;
 
-async function startScan(){
-  if(!('NDEFReader'in window)){alert('Web NFC ใช้ได้เฉพาะ Android + Chrome + HTTPS');return;}
-  try{
-    controller=new AbortController();
-    const r=new NDEFReader();
-    await r.scan({signal:controller.signal});
-    $('#status').textContent='กำลังสแกน...'; $('#btnStart').disabled=true; $('#btnStop').disabled=false; log('เริ่มสแกนแล้ว');
-    r.onreading=ev=>{
-      const uid=(ev.serialNumber||'').replace(/:/g,'').toLowerCase();
-      if(!uid){log('ไม่พบ UID','err');return;}
-      const now=Date.now(); if(uid===lastUID && now-lastTime<1200){log('ซ้ำเร็วเกิน','warn');return;}
-      lastUID=uid; lastTime=now;
-      $('#last').textContent=uid.toUpperCase(); log(`UID: ${uid}`);
+async function startScan() {
+  if (!('NDEFReader' in window)) {
+    alert('Web NFC ใช้ได้เฉพาะ Android + Chrome + เปิดผ่าน HTTPS');
+    return;
+  }
+  try {
+    controller = new AbortController();
+    const r = new NDEFReader();
+    await r.scan({ signal: controller.signal });
+
+    $('#status').textContent = 'กำลังสแกน...';
+    $('#btnStart').disabled = true;
+    $('#btnStop').disabled = false;
+    log('เริ่มสแกนแล้ว');
+
+    r.onreading = ev => {
+      const uid = (ev.serialNumber || '').replace(/:/g, '').toLowerCase();
+      if (!uid) { log('ไม่พบ UID', 'err'); return; }
+
+      const now = Date.now();
+      if (uid === lastUID && (now - lastTime) < 1200) {
+        log('ซ้ำเร็วเกิน', 'warn'); return;
+      }
+      lastUID = uid; lastTime = now;
+
+      $('#last').textContent = uid.toUpperCase();
+      log(`UID: ${uid}`);
+
       saveToSheet(uid);
-      if(navigator.vibrate)navigator.vibrate(50);
+
+      if (navigator.vibrate) navigator.vibrate(50);
     };
-  }catch(e){alert('เริ่มสแกนไม่ได้: '+e); log(e,'err');}
+
+  } catch (e) {
+    alert('เริ่มสแกนไม่ได้: ' + e);
+    log(e, 'err');
+  }
 }
 
-function stopScan(){ if(controller){controller.abort(); controller=null;} $('#status').textContent='หยุดสแกนแล้ว'; $('#btnStart').disabled=false; $('#btnStop').disabled=true;}
-
-async function saveToSheet(uid){
-  try{
-    const params=new URLSearchParams({uid,device:navigator.platform||'',token:TOKEN});
-    const res=await fetch(GAS_URL,{method:'POST',body:params});
-    if(res.ok) log('บันทึกแล้ว: '+uid,'ok'); else log('บันทึกล้มเหลว '+res.status,'err');
-  }catch(e){log('ส่งไม่สำเร็จ: '+e,'err');}
+function stopScan() {
+  if (controller) { controller.abort(); controller = null; }
+  $('#status').textContent = 'หยุดสแกนแล้ว';
+  $('#btnStart').disabled = false;
+  $('#btnStop').disabled = true;
 }
 
-$('#btnStart').onclick=startScan;
-$('#btnStop').onclick=stopScan;
+async function saveToSheet(uid) {
+  try {
+    // ส่งแบบ form-encoded และ no-cors → เบราว์เซอร์จะยอมยิงคำขอโดยไม่เช็ค CORS
+    const params = new URLSearchParams({
+      uid,
+      device: (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '',
+      token: TOKEN
+    });
+
+    await fetch(GAS_URL, {
+      method: 'POST',
+      mode: 'no-cors', // สำคัญ!
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: params.toString()
+    });
+
+    // no-cors อ่านผลตอบกลับไม่ได้ แต่คำสั่งถูกส่งไปแล้ว
+    log('ส่งแล้ว (ข้อมูลจะเข้า Google Sheets ภายในไม่กี่วินาที)', 'ok');
+
+  } catch (e) {
+    log('ส่งไม่สำเร็จ: ' + e, 'err');
+  }
+}
+
+$('#btnStart').addEventListener('click', startScan);
+$('#btnStop').addEventListener('click',  stopScan);
 </script>
 </body>
 </html>
-
